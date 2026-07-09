@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POTHOLE WATCH // Road Hazard Monitoring System</title>
+<meta name="description" content="Civic infrastructure module for reporting, tracking, and triaging road potholes in real time.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt:#17181b;
+    --asphalt-2:#1f2124;
+    --crack:#2a2c30;
+    --hazard:#ffbe0b;
+    --safety:#ff6b35;
+    --critical:#e63946;
+    --ok:#4caf7d;
+    --text:#f3f2ee;
+    --muted:#8d9096;
+    --line:#33353a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--asphalt);
+    color:var(--text);
+    font-family:'Barlow Condensed', sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    background-image:
+      radial-gradient(circle at 18% 30%, rgba(255,255,255,.02) 0, transparent 45%),
+      radial-gradient(circle at 82% 70%, rgba(255,255,255,.015) 0, transparent 40%);
+  }
+  h1,h2,h3{font-family:'Archivo Black', sans-serif; text-transform:uppercase; letter-spacing:.01em; line-height:1.05;}
+  .mono{font-family:'DM Mono', monospace;}
+  a{color:inherit;}
+
+  /* road stripe divider */
+  .stripe{
+    height:6px; width:100%;
+    background:repeating-linear-gradient(90deg, var(--hazard) 0 34px, transparent 34px 58px);
+    opacity:.85;
+  }
+
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:18px 40px;
+    background:rgba(23,24,27,.9);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .logo{
+    font-family:'Archivo Black', sans-serif; font-size:17px; letter-spacing:.02em;
+    display:flex; align-items:center; gap:10px;
+  }
+  .logo .sq{width:12px; height:12px; background:var(--hazard); display:inline-block; transform:rotate(45deg);}
+  .topbar .meta{font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); letter-spacing:.08em;}
+
+  section{padding:110px 40px; max-width:1180px; margin:0 auto; position:relative;}
+
+  /* HERO */
+  .hero{
+    display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
+    padding-top:76px; min-height:86vh;
+  }
+  .eyebrow{
+    font-family:'DM Mono', monospace; font-size:12px; color:var(--hazard);
+    letter-spacing:.18em; margin-bottom:20px; display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:"⚠"; }
+  .hero h1{font-size:clamp(42px,6.2vw,80px);}
+  .hero h1 .brk{color:var(--hazard);}
+  .hero p.lede{color:var(--muted); max-width:520px; margin:24px 0 34px; font-size:18px;}
+  .btn-row{display:flex; gap:14px; flex-wrap:wrap;}
+  .btn{
+    font-family:'DM Mono', monospace; font-size:13px; letter-spacing:.06em; text-transform:uppercase;
+    padding:15px 24px; border:2px solid var(--text); background:transparent; color:var(--text);
+    text-decoration:none; display:inline-flex; align-items:center; gap:10px; cursor:pointer; transition:.2s;
+  }
+  .btn:hover{background:var(--text); color:var(--asphalt);}
+  .btn.solid{background:var(--hazard); border-color:var(--hazard); color:#1a1400; font-weight:600;}
+  .btn.solid:hover{background:#ffd35c; color:#1a1400;}
+
+  /* road viz */
+  .road{
+    position:relative; aspect-ratio:1/1.05; max-width:420px; margin:0 auto;
+    background:linear-gradient(180deg, var(--asphalt-2), #131417);
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .road .lane{
+    position:absolute; left:50%; top:0; bottom:0; width:8px; transform:translateX(-50%);
+    background:repeating-linear-gradient(180deg, var(--hazard) 0 26px, transparent 26px 52px);
+    animation:drift 2.4s linear infinite;
+  }
+  @keyframes drift{to{background-position-y:52px;}}
+  .pin{
+    position:absolute; width:0; height:0;
+    border-left:9px solid transparent; border-right:9px solid transparent;
+    border-top:14px solid var(--critical);
+    filter:drop-shadow(0 0 6px rgba(230,57,70,.7));
+    animation:drop .5s ease-out both;
+  }
+  .pin::after{content:""; position:absolute; top:-24px; left:-3px; width:6px; height:6px; border-radius:50%; background:var(--critical);}
+  @keyframes drop{from{transform:translateY(-30px); opacity:0;}to{transform:translateY(0); opacity:1;}}
+  .crack{position:absolute; background:#0d0e10; border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.4) inset;}
+  .road-label{
+    position:absolute; bottom:-34px; left:50%; transform:translateX(-50%);
+    font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); letter-spacing:.14em; white-space:nowrap;
+  }
+
+  /* SECTION LABEL */
+  .sec-label{display:flex; align-items:center; gap:16px; margin-bottom:46px;}
+  .sec-label .idx{font-family:'DM Mono',monospace; color:var(--hazard); font-size:12px; letter-spacing:.18em;}
+  .sec-label .rule{flex:1; height:1px; background:var(--line);}
+  .sec-label h2{font-size:28px;}
+
+  /* BRIEF */
+  .briefing{display:grid; grid-template-columns:1fr 1fr; gap:60px;}
+  .briefing p{color:var(--muted); margin-bottom:16px; font-size:17px;}
+  .briefing strong{color:var(--text); font-weight:600;}
+  .stat-block{display:grid; grid-template-columns:1fr 1fr; gap:20px; align-content:start;}
+  .stat{border:1px solid var(--line); background:var(--asphalt-2); padding:20px;}
+  .stat .n{font-family:'Archivo Black',sans-serif; font-size:34px; color:var(--hazard);}
+  .stat .l{font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); letter-spacing:.1em; margin-top:6px;}
+
+  /* SEVERITY MODULES */
+  .modules{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line);}
+  .module{background:var(--asphalt-2); padding:26px 22px; position:relative;}
+  .module .sev-bar{height:4px; width:38px; margin-bottom:18px;}
+  .module h3{font-size:20px; margin-bottom:10px;}
+  .module p{color:var(--muted); font-size:14px;}
+  .module .code{font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:.1em; margin-top:14px; display:block;}
+  .m1 .sev-bar{background:var(--ok);}
+  .m2 .sev-bar{background:var(--hazard);}
+  .m3 .sev-bar{background:var(--safety);}
+  .m4 .sev-bar{background:var(--critical);}
+
+  /* PIPELINE */
+  .pipeline{display:flex; flex-direction:column; border:1px solid var(--line);}
+  .pstep{
+    display:grid; grid-template-columns:70px 1fr; gap:24px; padding:26px 26px;
+    border-bottom:1px solid var(--line); align-items:center;
+  }
+  .pstep:last-child{border-bottom:none;}
+  .pstep .pnum{font-family:'Archivo Black',sans-serif; font-size:28px; color:var(--line);}
+  .pstep h3{font-size:19px; margin-bottom:6px;}
+  .pstep p{color:var(--muted); font-size:14px;}
+
+  /* STACK */
+  .stack-row{display:flex; flex-wrap:wrap; gap:12px;}
+  .chip{
+    border:1px solid var(--line); padding:11px 18px; font-family:'DM Mono',monospace; font-size:12px; color:var(--muted);
+    display:flex; align-items:center; gap:8px;
+  }
+  .chip::before{content:"—"; color:var(--hazard);}
+
+  /* CTA */
+  .cta{text-align:center; padding:100px 40px; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .cta h2{font-size:clamp(30px,4.4vw,48px); margin-bottom:18px;}
+  .cta p{color:var(--muted); margin-bottom:34px; font-size:18px;}
+  .cta code{
+    display:inline-block; margin-top:28px; padding:15px 22px; background:var(--asphalt-2);
+    border:1px solid var(--line); color:var(--hazard); font-family:'DM Mono',monospace; font-size:12px;
+  }
+
+  footer{
+    padding:30px 40px; display:flex; justify-content:space-between;
+    color:var(--muted); font-family:'DM Mono',monospace; font-size:11px; letter-spacing:.08em; flex-wrap:wrap; gap:10px;
+  }
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;}
+    .briefing{grid-template-columns:1fr;}
+    .modules{grid-template-columns:1fr 1fr;}
+    .pstep{grid-template-columns:44px 1fr;}
+    section{padding:70px 22px;}
+    .topbar{padding:14px 20px;}
+  }
+  @media (max-width:560px){
+    .modules{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><span class="sq"></span> POTHOLE WATCH</div>
+  <div class="meta mono">MODULE: ROAD-HAZARD-MONITORING · v1.0</div>
+</div>
+<div class="stripe"></div>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">CIVIC INFRASTRUCTURE MODULE</div>
+    <h1>SEE THE POTHOLE<br>BEFORE IT<br><span class="brk">SEES YOUR CAR.</span></h1>
+    <p class="lede">A crowd-reported, GPS-tagged monitoring system for road damage — logging every pothole from first report to fixed, so city crews fix what matters most, first.</p>
+    <div class="btn-row">
+      <a class="btn solid" href="#report">Report a Pothole →</a>
+      <a class="btn" href="#pipeline">How It Works</a>
+    </div>
+  </div>
+  <div>
+    <div class="road">
+      <div class="lane"></div>
+      <div class="crack" style="width:34px; height:22px; top:22%; left:18%;"></div>
+      <div class="crack" style="width:20px; height:16px; top:60%; left:68%;"></div>
+      <div class="crack" style="width:26px; height:18px; top:78%; left:30%;"></div>
+      <div class="pin" style="top:18%; left:22%; animation-delay:.1s;"></div>
+      <div class="pin" style="top:55%; left:70%; animation-delay:.4s;"></div>
+      <div class="pin" style="top:74%; left:34%; animation-delay:.7s;"></div>
+    </div>
+    <div class="road-label">LIVE REPORTS · 3 FLAGGED ON THIS STRETCH</div>
+  </div>
+</section>
+
+<section class="briefing">
+  <div>
+    <div class="sec-label"><span class="idx">BRIEF</span><div class="rule"></div></div>
+    <p><strong>Every pothole starts as a report.</strong> A driver, cyclist, or pedestrian drops a pin, adds a photo, and the system logs GPS location, timestamp, and estimated severity.</p>
+    <p>Reports cluster on a live map, so repeated flags on the same stretch of road automatically escalate priority — no single complaint gets lost, and no ward gets left off the map.</p>
+    <p>Built for local roads, sized for a city: <strong>Faridabad-first</strong>, with a structure that scales to any municipality willing to plug in its ward boundaries.</p>
+  </div>
+  <div class="stat-block">
+    <div class="stat"><div class="n">4</div><div class="l">SEVERITY TIERS</div></div>
+    <div class="stat"><div class="n">GPS</div><div class="l">AUTO-LOCATED</div></div>
+    <div class="stat"><div class="n">24H</div><div class="l">TARGET TRIAGE TIME</div></div>
+    <div class="stat"><div class="n">OPEN</div><div class="l">PUBLIC REPORT LOG</div></div>
+  </div>
+</section>
+
+<section id="modules">
+  <div class="sec-label"><span class="idx">SEVERITY SCALE</span><div class="rule"></div></div>
+  <div class="modules">
+    <div class="module m1">
+      <div class="sev-bar"></div>
+      <h3>Minor</h3>
+      <p>Shallow surface wear. Logged and monitored, no immediate action needed.</p>
+      <span class="code">TIER-01 · WATCH</span>
+    </div>
+    <div class="module m2">
+      <div class="sev-bar"></div>
+      <h3>Moderate</h3>
+      <p>Noticeable depth, affects ride comfort. Queued for scheduled repair.</p>
+      <span class="code">TIER-02 · QUEUED</span>
+    </div>
+    <div class="module m3">
+      <div class="sev-bar"></div>
+      <h3>Severe</h3>
+      <p>Vehicle-damage risk. Flagged for priority dispatch to road crews.</p>
+      <span class="code">TIER-03 · PRIORITY</span>
+    </div>
+    <div class="module m4">
+      <div class="sev-bar"></div>
+      <h3>Critical</h3>
+      <p>Immediate hazard to two-wheelers and pedestrians. Escalated same-day.</p>
+      <span class="code">TIER-04 · URGENT</span>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="sec-label"><span class="idx">HOW IT WORKS</span><div class="rule"></div></div>
+  <div class="pipeline">
+    <div class="pstep">
+      <div class="pnum">01</div>
+      <div><h3>Spot it</h3><p>See a pothole. Open the app, snap a photo — location is captured automatically.</p></div>
+    </div>
+    <div class="pstep">
+      <div class="pnum">02</div>
+      <div><h3>Flag severity</h3><p>Rate it Minor to Critical. Nearby reports on the same stretch merge automatically.</p></div>
+    </div>
+    <div class="pstep">
+      <div class="pnum">03</div>
+      <div><h3>Track status</h3><p>Every report is public — see it move from Reported → Queued → Fixed.</p></div>
+    </div>
+    <div class="pstep">
+      <div class="pnum">04</div>
+      <div><h3>Confirm the fix</h3><p>Once repaired, the original reporter (or anyone nearby) can confirm and close it out.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-label"><span class="idx">STACK</span><div class="rule"></div></div>
+  <div class="stack-row">
+    <div class="chip">Leaflet.js / MapLibre</div>
+    <div class="chip">Geolocation API</div>
+    <div class="chip">Photo Upload</div>
+    <div class="chip">Ward-Level Clustering</div>
+  </div>
+</section>
+
+<section class="cta" id="report">
+  <div class="sec-label" style="justify-content:center;"><span class="idx">JOIN THE WATCH</span></div>
+  <h2>Bad road nearby?<br>Put it on the map.</h2>
+  <p>Every pin makes the next repair crew's route more useful.</p>
+  <a class="btn solid" href="#">Report a Pothole →</a>
+  <br>
+  <code>STATUS: OPEN FOR PUBLIC REPORTS</code>
+</section>
+
+<footer>
+  <span>POTHOLE WATCH © Civic Infra Module</span>
+  <span>ROAD HAZARD MONITORING · FARIDABAD-FIRST</span>
+</footer>
+
+</body>
+</html>
