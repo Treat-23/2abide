@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEEP CATCH // Offshore Fishing Fleet Monitoring</title>
+<meta name="description" content="Sonar-grade tracking for fishing vessels operating in open water — position, catch zone, and safety status in one console.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --abyss:#051822;
+    --deep:#082633;
+    --panel:#0a2c3a;
+    --line:#134655;
+    --cyan:#4fe3ff;
+    --cyan-dim:#1f6b7d;
+    --amber:#ffb703;
+    --danger:#ff5c5c;
+    --foam:#e8f6f7;
+    --muted:#5f8a97;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--abyss);
+    color:var(--foam);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    line-height:1.6;
+    background-image:
+      radial-gradient(ellipse at 20% -10%, rgba(79,227,255,.07) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 110%, rgba(79,227,255,.05) 0%, transparent 50%);
+  }
+  h1,h2,h3{font-family:'Space Grotesk', sans-serif; font-weight:700; letter-spacing:-.01em; line-height:1.05;}
+  a{color:inherit;}
+
+  /* wave divider */
+  .wave{width:100%; display:block; line-height:0;}
+  .wave svg{width:100%; height:34px; display:block;}
+
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 40px;
+    background:rgba(5,24,34,.88);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    font-size:12px; letter-spacing:.1em;
+  }
+  .topbar .logo{
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:17px; color:var(--cyan);
+    display:flex; align-items:center; gap:9px;
+  }
+  .logo .dot{width:8px; height:8px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); animation:blink 2.6s infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .topbar .meta{color:var(--muted); font-size:11px;}
+
+  section{padding:110px 40px; max-width:1180px; margin:0 auto; position:relative;}
+
+  /* HERO */
+  .hero{
+    display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
+    padding-top:70px; min-height:86vh;
+  }
+  .eyebrow{
+    color:var(--amber); font-size:12px; letter-spacing:.2em; margin-bottom:20px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:"~"; color:var(--cyan-dim);}
+  .hero h1{font-size:clamp(40px,5.8vw,74px);}
+  .hero h1 .accent{color:var(--cyan); text-shadow:0 0 24px rgba(79,227,255,.35);}
+  .hero p.lede{color:var(--muted); max-width:520px; margin:24px 0 34px; font-size:15px;}
+  .btn-row{display:flex; gap:14px; flex-wrap:wrap;}
+  .btn{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    padding:14px 22px; border:1px solid var(--cyan-dim); background:transparent; color:var(--cyan);
+    text-decoration:none; display:inline-flex; align-items:center; gap:10px; cursor:pointer; transition:.2s;
+  }
+  .btn:hover{background:rgba(79,227,255,.08); border-color:var(--cyan);}
+  .btn.solid{background:var(--cyan); border-color:var(--cyan); color:#04222c; font-weight:600;}
+  .btn.solid:hover{background:#7cebff;}
+
+  /* SONAR */
+  .sonar-wrap{position:relative; aspect-ratio:1/1; max-width:420px; margin:0 auto;}
+  .sonar{
+    position:relative; width:100%; height:100%; border-radius:50%;
+    border:1px solid var(--line);
+    background:radial-gradient(circle, rgba(79,227,255,.06) 0%, transparent 70%);
+    overflow:hidden;
+  }
+  .sonar .ring{position:absolute; border:1px solid var(--line); border-radius:50%; inset:0;}
+  .sonar .ping{
+    position:absolute; inset:0; border-radius:50%; border:1px solid var(--cyan);
+    opacity:0; animation:ping 3.2s ease-out infinite;
+  }
+  .sonar .ping:nth-child(2){animation-delay:1.6s;}
+  @keyframes ping{
+    0%{transform:scale(.15); opacity:.9;}
+    100%{transform:scale(1); opacity:0;}
+  }
+  .sonar .sweep{
+    position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(79,227,255,.5), transparent 30%);
+    animation:spin 5s linear infinite; mix-blend-mode:screen;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .vessel{
+    position:absolute; width:6px; height:6px; border-radius:50%;
+    background:var(--amber); box-shadow:0 0 8px 2px rgba(255,183,3,.8);
+    animation:fade 5s infinite;
+  }
+  @keyframes fade{0%,100%{opacity:0;}10%{opacity:1;}26%{opacity:0;}}
+  .sonar-label{
+    position:absolute; bottom:-34px; left:50%; transform:translateX(-50%);
+    font-size:11px; color:var(--muted); letter-spacing:.14em; white-space:nowrap;
+  }
+
+  .sec-label{display:flex; align-items:center; gap:16px; margin-bottom:46px;}
+  .sec-label .idx{color:var(--amber); font-size:12px; letter-spacing:.18em;}
+  .sec-label .rule{flex:1; height:1px; background:var(--line);}
+  .sec-label h2{font-size:27px;}
+
+  .briefing{display:grid; grid-template-columns:1fr 1fr; gap:60px;}
+  .briefing p{color:var(--muted); margin-bottom:16px; font-size:14px;}
+  .briefing strong{color:var(--foam); font-weight:600;}
+  .stat-block{display:grid; grid-template-columns:1fr 1fr; gap:20px; align-content:start;}
+  .stat{border:1px solid var(--line); background:var(--panel); padding:18px;}
+  .stat .n{font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:var(--cyan);}
+  .stat .l{font-size:11px; color:var(--muted); letter-spacing:.1em; margin-top:4px;}
+
+  .modules{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line); border:1px solid var(--line);}
+  .module{background:var(--panel); padding:32px;}
+  .module .head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px;}
+  .module .tag{font-size:10px; letter-spacing:.14em; color:var(--cyan-dim); border:1px solid var(--cyan-dim); padding:3px 8px;}
+  .module .led{width:8px; height:8px; border-radius:50%; background:var(--cyan); box-shadow:0 0 6px var(--cyan);}
+  .module h3{font-size:20px; margin-bottom:10px;}
+  .module p{color:var(--muted); font-size:13px;}
+
+  .zone-legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:10px;}
+  .zone{
+    display:flex; align-items:center; gap:8px; border:1px solid var(--line); padding:10px 14px; font-size:12px; color:var(--muted);
+  }
+  .zone .sw{width:10px; height:10px; border-radius:50%;}
+  .z1{background:var(--cyan);} .z2{background:var(--amber);} .z3{background:var(--danger);}
+
+  .manifest{border:1px solid var(--line); background:var(--deep);}
+  .manifest .bar{
+    display:flex; justify-content:space-between; padding:12px 18px;
+    border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); letter-spacing:.12em;
+  }
+  .manifest .row{
+    display:grid; grid-template-columns:100px 1fr 100px 90px; gap:14px; align-items:center;
+    padding:13px 18px; border-bottom:1px solid var(--line); font-size:12px;
+  }
+  .manifest .row:last-child{border-bottom:none;}
+  .manifest .row:hover{background:rgba(79,227,255,.04);}
+  .manifest .id{color:var(--cyan-dim);}
+  .manifest .status{font-size:11px;}
+  .st-active{color:var(--cyan);}
+  .st-return{color:var(--amber);}
+  .st-alert{color:var(--danger);}
+
+  .stack-row{display:flex; flex-wrap:wrap; gap:12px;}
+  .chip{border:1px solid var(--line); padding:10px 16px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;}
+  .chip::before{content:"▹"; color:var(--cyan);}
+
+  .cta{text-align:center; padding:100px 40px; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .cta h2{font-size:clamp(28px,4vw,44px); margin-bottom:18px;}
+  .cta p{color:var(--muted); margin-bottom:34px;}
+  .cta code{
+    display:inline-block; margin-top:28px; padding:14px 20px; background:var(--panel);
+    border:1px solid var(--line); color:var(--cyan); font-size:12px;
+  }
+
+  footer{padding:30px 40px; display:flex; justify-content:space-between; color:var(--muted); font-size:11px; letter-spacing:.1em; flex-wrap:wrap; gap:10px;}
+
+  @media (max-width:860px){
+    .hero{grid-template-columns:1fr;}
+    .briefing{grid-template-columns:1fr;}
+    .modules{grid-template-columns:1fr;}
+    .manifest .row{grid-template-columns:70px 1fr 80px;}
+    .manifest .row span:nth-child(3){display:none;}
+    section{padding:70px 22px;}
+    .topbar{padding:14px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><span class="dot"></span>DEEP CATCH</div>
+  <div class="meta">FLEET MONITORING · OPEN WATER</div>
+</div>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">OFFSHORE FISHING FLEET MODULE</div>
+    <h1>EVERY BOAT.<br><span class="accent">EVERY MILE</span><br>OF OPEN SEA.</h1>
+    <p class="lede">Sonar-grade position tracking for fishing vessels working far offshore — live location, catch-zone status, and distress alerts, all in one console watching over the fleet.</p>
+    <div class="btn-row">
+      <a class="btn solid" href="#fleet">View Fleet Status →</a>
+      <a class="btn" href="#modules">System Modules</a>
+    </div>
+  </div>
+  <div class="sonar-wrap">
+    <div class="sonar">
+      <div class="ring" style="inset:12%;"></div>
+      <div class="ring" style="inset:30%;"></div>
+      <div class="ring" style="inset:48%;"></div>
+      <div class="ping"></div>
+      <div class="ping"></div>
+      <div class="sweep"></div>
+      <div class="vessel" style="top:28%; left:60%; animation-delay:0s;"></div>
+      <div class="vessel" style="top:66%; left:38%; animation-delay:1.2s;"></div>
+      <div class="vessel" style="top:44%; left:20%; animation-delay:2.4s;"></div>
+      <div class="vessel" style="top:20%; left:42%; animation-delay:3.6s;"></div>
+    </div>
+    <div class="sonar-label">FLEET SWEEP · 4 VESSELS ON SONAR</div>
+  </div>
+</section>
+
+<section class="briefing">
+  <div>
+    <div class="sec-label"><span class="idx">BRIEFING</span><div class="rule"></div></div>
+    <p><strong>Open water has no landmarks.</strong> A vessel can drift out of radio range fast, and a distress call miles offshore only helps if someone's watching the board when it comes in.</p>
+    <p>Deep Catch keeps a live position on every registered boat, flags entry into restricted or high-risk zones, and turns a dropped signal into an immediate alert instead of a delayed guess.</p>
+    <p>Built for small and mid-size fishing fleets — the coast guard doesn't need a spreadsheet, they need a screen that already knows something's wrong.</p>
+  </div>
+  <div class="stat-block">
+    <div class="stat"><div class="n">24/7</div><div class="l">LIVE POSITION FEED</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">ZONE RISK TIERS</div></div>
+    <div class="stat"><div class="n">SOS</div><div class="l">ONE-TAP DISTRESS</div></div>
+    <div class="stat"><div class="n">GPS</div><div class="l">+ AIS COMPATIBLE</div></div>
+  </div>
+</section>
+
+<section id="modules">
+  <div class="sec-label"><span class="idx">SYSTEM MODULES</span><div class="rule"></div></div>
+  <div class="modules">
+    <div class="module">
+      <div class="head"><span class="tag">MOD.TRK</span><span class="led"></span></div>
+      <h3>Vessel Tracking</h3>
+      <p>Live GPS/AIS position for every boat in the fleet, refreshed continuously and plotted on a shared chart.</p>
+    </div>
+    <div class="module">
+      <div class="head"><span class="tag">MOD.ZON</span><span class="led"></span></div>
+      <h3>Zone Monitoring</h3>
+      <p>Flags vessels entering restricted, storm-risk, or unauthorized fishing zones before it becomes a violation.</p>
+      <div class="zone-legend">
+        <div class="zone"><span class="sw z1"></span>Cleared water</div>
+        <div class="zone"><span class="sw z2"></span>Caution zone</div>
+        <div class="zone"><span class="sw z3"></span>Restricted</div>
+      </div>
+    </div>
+    <div class="module">
+      <div class="head"><span class="tag">MOD.SOS</span><span class="led"></span></div>
+      <h3>Distress Alerting</h3>
+      <p>One-tap SOS or an unexpected signal loss triggers an immediate alert to the shore station and nearby vessels.</p>
+    </div>
+    <div class="module">
+      <div class="head"><span class="tag">MOD.LOG</span><span class="led"></span></div>
+      <h3>Catch & Trip Log</h3>
+      <p>Records trip duration, route, and catch zone per voyage — useful for both safety review and yield tracking.</p>
+    </div>
+  </div>
+</section>
+
+<section id="fleet">
+  <div class="sec-label"><span class="idx">FLEET STATUS</span><div class="rule"></div></div>
+  <div class="manifest">
+    <div class="bar"><span>REGISTRY: DEEP-CATCH-FLEET</span><span>UPDATED: LIVE</span></div>
+    <div class="row"><span class="id">DC-014</span><span>MV Sagar Kanya</span><span>18 NM OUT</span><span class="status st-active">● ACTIVE</span></div>
+    <div class="row"><span class="id">DC-022</span><span>MV Neelam</span><span>34 NM OUT</span><span class="status st-active">● ACTIVE</span></div>
+    <div class="row"><span class="id">DC-007</span><span>MV Samudra Putri</span><span>9 NM OUT</span><span class="status st-return">● RETURNING</span></div>
+    <div class="row"><span class="id">DC-031</span><span>MV Tarang</span><span>41 NM OUT</span><span class="status st-alert">● SIGNAL LOST</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-label"><span class="idx">STACK</span><div class="rule"></div></div>
+  <div class="stack-row">
+    <div class="chip">GPS / AIS</div>
+    <div class="chip">Leaflet.js Nautical Charts</div>
+    <div class="chip">Real-time WebSockets</div>
+    <div class="chip">SMS / Satellite Fallback</div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="sec-label" style="justify-content:center;"><span class="idx">DEPLOY</span></div>
+  <h2>Know where the fleet is.<br>Before the storm does.</h2>
+  <p>Register a vessel and it shows up on the board — that's the whole onboarding.</p>
+  <a class="btn solid" href="#">Register a Vessel →</a>
+  <br>
+  <code>STATUS: MONITORING · ALL CHANNELS OPEN</code>
+</section>
+
+<footer>
+  <span>DEEP CATCH © Offshore Fleet Module</span>
+  <span>FISHING VESSEL MONITORING · OPEN WATER</span>
+</footer>
+
+</body>
+</html>
